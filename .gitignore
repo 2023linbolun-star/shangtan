@@ -1,0 +1,13 @@
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.env
+.env.local
+.venv/
+dist/
+build/
+.DS_Store
+*.log
+postgres_data/
+redis_data/
