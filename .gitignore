@@ -11,3 +11,4 @@ build/
 *.log
 postgres_data/
 redis_data/
+.claude/worktrees/

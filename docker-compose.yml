@@ -1,0 +1,62 @@
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/rate-limit.conf:/etc/nginx/conf.d/rate-limit.conf:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://shangtanai:shangtanai@postgres:5432/shangtanai
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://nginx
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: shangtanai
+      POSTGRES_USER: shangtanai
+      POSTGRES_PASSWORD: shangtanai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shangtanai"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:

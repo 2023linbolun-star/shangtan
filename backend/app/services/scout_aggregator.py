@@ -13,10 +13,13 @@ Scout Aggregator — 选品数据聚合服务
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 from app.core.config import VEAPI_KEY
+
+logger = logging.getLogger("shangtanai.scout_aggregator")
 from app.services.platforms.base import PlatformProduct, PlatformSearchResult
 
 # 官方适配器
@@ -275,13 +278,24 @@ class ScoutAggregator:
 
         for name, resp in zip(task_names, responses):
             if isinstance(resp, Exception):
+                logger.error("[%s] 平台 %s 搜索异常: %s", keyword, name, resp)
                 result.errors[name] = str(resp)
             elif name == "xhs_notes":
                 result.xhs_data = resp
             elif isinstance(resp, PlatformSearchResult):
                 result.platforms[name] = resp
                 if resp.error:
+                    logger.warning("[%s] 平台 %s 返回错误: %s", keyword, name, resp.error)
                     result.errors[name] = resp.error
+                if resp.products:
+                    logger.info("[%s] 平台 %s 返回 %d 条商品", keyword, name, len(resp.products))
+                else:
+                    logger.warning("[%s] 平台 %s 返回 0 条商品", keyword, name)
                 result.total_products += len(resp.products)
+
+        if result.errors:
+            logger.warning("[%s] 聚合完成，%d 个平台有错误: %s", keyword, len(result.errors), result.errors)
+        logger.info("[%s] 聚合完成: %d 条商品, 已配置平台=%s, 未配置=%s",
+                     keyword, result.total_products, result.configured_platforms, result.unconfigured_platforms)
 
         return result

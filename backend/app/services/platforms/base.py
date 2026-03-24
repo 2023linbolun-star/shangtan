@@ -79,3 +79,45 @@ class PlatformAdapter(abc.ABC):
             products=[],
             error=error,
         )
+
+
+class WriteAdapter(abc.ABC):
+    """Write data to platform (publish content, create listings, manage ads)."""
+
+    @abc.abstractmethod
+    async def publish_content(self, content_data: dict) -> dict:
+        """Publish content to platform. Returns result with url/id."""
+        ...
+
+    @abc.abstractmethod
+    async def create_listing(self, listing_data: dict) -> dict:
+        """Create a product listing. Returns result."""
+        ...
+
+    def is_write_configured(self) -> bool:
+        """Check if write credentials are configured."""
+        return False
+
+
+class ManualAdapter:
+    """For platforms without API — generates instructions and copy-packages for user."""
+
+    def generate_copy_package(self, content_data: dict) -> dict:
+        """Generate a one-click copy package for manual publishing."""
+        return {
+            "title": content_data.get("title", ""),
+            "body": content_data.get("body", ""),
+            "tags": content_data.get("tags", []),
+            "image_suggestions": content_data.get("image_suggestions", []),
+            "instructions": content_data.get("instructions", ""),
+            "platform": content_data.get("platform", "unknown"),
+        }
+
+    def generate_listing_package(self, listing_data: dict, target_platform: str) -> dict:
+        """Generate a data package for manual listing upload."""
+        return {
+            "platform": target_platform,
+            "format": "csv" if target_platform in ("taobao",) else "excel",
+            "data": listing_data,
+            "instructions": f"下载数据包并上传到{target_platform}卖家中心",
+        }

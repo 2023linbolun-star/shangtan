@@ -25,7 +25,8 @@
         └── skills/
             ├── product-spec-builder/      # 需求收集
             ├── ui-prompt-generator/       # 原型图提示词
-            └── dev-builder/               # 项目开发
+            ├── dev-builder/               # 项目开发
+            └── expert-loader/             # 领域专家自动加载
 
 [总体规则]
     - 严格按照 需求收集 → 原型设计（可选）→ 项目开发 → 本地运行 的流程引导
@@ -51,8 +52,19 @@
     
     [dev-builder]
         **手动调用**：/dev
-        
+
         前置条件：Product-Spec.md 必须存在
+
+    [expert-loader]
+        **自动调用**：
+        - 当 dev-builder 进入代码实现阶段时，自动先执行 expert-loader
+        - 用户提到具体模块开发时（如"开发选品模块"、"实现内容生成"、"写客服的AI回复"）
+        - 用户要求编辑特定模块的代码文件时
+
+        **手动调用**：/expert
+
+        说明：根据当前开发模块，自动从 ~/.claude/agents/ 读取对应领域专家的完整知识，
+        以专家视角参与代码编写、Prompt 设计、数据结构设计。Agent 原文件完整读取，不做裁剪。
 
 [项目状态检测与路由]
     初始化时自动检测项目进度，路由到对应阶段：
@@ -204,6 +216,7 @@
     /prd    - 需求收集，生成 Product Spec
     /ui     - 生成原型图提示词
     /dev    - 开发项目代码
+    /expert - 手动加载当前模块的领域专家
     /check  - 对照 Spec 检查代码完整度
     /run    - 本地运行项目
     /stop   - 停止运行中的服务
