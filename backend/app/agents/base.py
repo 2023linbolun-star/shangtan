@@ -43,6 +43,7 @@ class AgentResult:
     ai_calls: list[dict] = field(default_factory=list)
     duration_ms: float = 0.0
     sub_agent_results: list["AgentResult"] = field(default_factory=list)
+    applied_preferences: list[str] = field(default_factory=list)  # 归因流：实际应用了哪些偏好
 
 
 class BaseAgent(ABC):

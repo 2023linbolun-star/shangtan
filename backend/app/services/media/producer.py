@@ -328,6 +328,211 @@ async def produce_xhs_images(
     return result
 
 
+async def produce_carousel(
+    content_output: dict,
+    category: str = "default",
+) -> dict:
+    """
+    抖音图文轮播生产（信息差/妙招通用）。
+
+    Args:
+        content_output: 涨粉Agent的输出（slides结构）
+
+    Returns:
+        {"images": [...], "audio_path": "...", "title": "...", "cost_breakdown": {...}}
+    """
+    job_id = str(uuid.uuid4())[:8]
+    output_dir = os.path.join(ASSETS_DIR, "carousel", job_id)
+    os.makedirs(output_dir, exist_ok=True)
+
+    logger.info(f"[{job_id}] Starting carousel production")
+    cost = {"image": 0.0, "tts": 0.0, "total": 0.0}
+
+    data = _parse_json_safe(content_output.get("content", "{}"))
+    slides = data.get("slides", [])
+    title = data.get("title", "")
+
+    if not slides:
+        return {"images": [], "error": "无slide数据"}
+
+    # 生图
+    image_requests = []
+    for slide in slides:
+        image_requests.append({
+            "prompt": slide.get("visual_description", "信息图表，清晰排版"),
+            "negative_prompt": "模糊，低质量，水印",
+        })
+
+    image_results = await image_gen.generate_batch(
+        prompts=image_requests,
+        size="1080*1920",
+        save_dir=os.path.join(output_dir, "images"),
+    )
+
+    image_paths = []
+    for r in image_results:
+        imgs = r.get("images", [])
+        image_paths.append(imgs[0]["local_path"] if imgs else "")
+        cost["image"] += r.get("cost", 0)
+
+    # Pillow排版：叠加标题文字
+    composed = []
+    for i, (path, slide) in enumerate(zip(image_paths, slides)):
+        if not path or not os.path.exists(path):
+            composed.append(path)
+            continue
+        out_path = os.path.join(output_dir, f"slide_{i:02d}.jpg")
+        composed_path = xhs_compose.compose_content_card(
+            background_image_path=path,
+            headline=slide.get("headline", ""),
+            body_text="\n".join(slide.get("text_elements", [])),
+            card_number=i + 1,
+            output_path=out_path,
+        )
+        composed.append(composed_path)
+
+    # TTS配音
+    voiceover = data.get("voiceover_full", "")
+    audio_path = ""
+    if voiceover:
+        from app.services.media.tts import synthesize, get_voice_for_category
+        voice = get_voice_for_category(category)
+        tts_result = await synthesize(
+            text=voiceover,
+            voice=voice,
+            save_dir=os.path.join(output_dir, "audio"),
+        )
+        audio_path = tts_result.get("local_path", "")
+        cost["tts"] = tts_result.get("cost", 0)
+
+    cost["total"] = cost["image"] + cost["tts"]
+
+    return {
+        "images": composed,
+        "audio_path": audio_path,
+        "title": title,
+        "hashtags": data.get("hashtags", []),
+        "interaction_hook": data.get("interaction_hook", ""),
+        "slides_count": len(composed),
+        "cost_breakdown": cost,
+        "job_id": job_id,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+
+async def produce_xhs_review(
+    content_output: dict,
+    category: str = "default",
+) -> dict:
+    """
+    小红书真人测评图文生产。
+
+    图片风格：模拟真人手机拍照，不露脸。
+    不做Pillow文字排版，保持原始照片感。
+    后处理：轻微降饱和+加噪点，模拟手机质感。
+    """
+    job_id = str(uuid.uuid4())[:8]
+    output_dir = os.path.join(ASSETS_DIR, "xhs_review", job_id)
+    os.makedirs(output_dir, exist_ok=True)
+
+    logger.info(f"[{job_id}] Starting XHS review production")
+    cost = {"image": 0.0, "total": 0.0}
+
+    note = _parse_json_safe(content_output.get("content", "{}"))
+    image_prompts_data = _parse_json_safe(content_output.get("image_prompts", "{}"))
+
+    title = note.get("title", "")
+    content_text = note.get("content", "")
+    tags = note.get("tags", [])
+
+    image_prompt_list = image_prompts_data.get("images", [])
+    if not image_prompt_list:
+        # Fallback到笔记中的image_suggestions
+        suggestions = note.get("image_suggestions", [])
+        image_prompt_list = [
+            {"prompt": s.get("description", "产品手机随拍"), "negative_prompt": "精修，广告，正脸"}
+            for s in suggestions[:6]
+        ]
+
+    # 批量生图（真人测评风格，3:4竖版）
+    gen_requests = []
+    for ip in image_prompt_list[:6]:
+        prompt_text = ip.get("prompt", "产品手机随拍，自然光，生活场景")
+        negative = ip.get("negative_prompt", "精修，商业摄影，广告，完美光线，正脸，logo文字")
+        gen_requests.append({"prompt": prompt_text, "negative_prompt": negative})
+
+    image_results = await image_gen.generate_batch(
+        prompts=gen_requests,
+        size="1080*1440",
+        save_dir=os.path.join(output_dir, "raw"),
+    )
+
+    # 后处理：模拟手机拍照质感
+    final_images = []
+    for i, r in enumerate(image_results):
+        imgs = r.get("images", [])
+        if not imgs:
+            final_images.append("")
+            continue
+
+        raw_path = imgs[0]["local_path"]
+        cost["image"] += r.get("cost", 0)
+
+        if raw_path and os.path.exists(raw_path):
+            final_path = os.path.join(output_dir, f"final_{i:02d}.jpg")
+            _apply_phone_photo_effect(raw_path, final_path)
+            final_images.append(final_path)
+        else:
+            final_images.append(raw_path)
+
+    cost["total"] = cost["image"]
+
+    return {
+        "images": final_images,
+        "note_title": title,
+        "note_content": content_text,
+        "tags": tags,
+        "publishing_tips": note.get("publishing_tips", {}),
+        "persona": note.get("persona", {}),
+        "image_count": len(final_images),
+        "cost_breakdown": cost,
+        "job_id": job_id,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+
+def _apply_phone_photo_effect(input_path: str, output_path: str):
+    """后处理：模拟手机拍照质感（降饱和+加噪点+微过曝）。"""
+    try:
+        from PIL import Image, ImageEnhance, ImageFilter
+        import numpy as np
+
+        img = Image.open(input_path).convert("RGB")
+
+        # 轻微降低饱和度（手机拍的不会太浓艳）
+        enhancer = ImageEnhance.Color(img)
+        img = enhancer.enhance(0.85)
+
+        # 轻微提亮（手机HDR过曝感）
+        enhancer = ImageEnhance.Brightness(img)
+        img = enhancer.enhance(1.08)
+
+        # 加轻微噪点
+        arr = np.array(img)
+        noise = np.random.normal(0, 3, arr.shape).astype(np.int16)
+        arr = np.clip(arr.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+        img = Image.fromarray(arr)
+
+        # 轻微模糊边缘（模拟手机镜头边缘失真）
+        # 不做全局模糊，保持中心清晰
+
+        img.save(output_path, "JPEG", quality=92)
+    except ImportError:
+        # numpy不可用时直接复制
+        import shutil
+        shutil.copy2(input_path, output_path)
+
+
 async def produce_content(
     content_output: dict,
     platform: str,

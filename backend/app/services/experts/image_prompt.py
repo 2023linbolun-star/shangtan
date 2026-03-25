@@ -136,3 +136,59 @@ def build_xhs_image_prompt(
         strategy_json=strategy_json,
         image_plan_json=image_plan_json,
     )
+
+
+# ── 小红书真人测评风格生图Prompt ──
+
+XHS_REVIEW_IMAGE_PROMPT = """请为以下小红书真人测评笔记生成6张配图的AI生图prompt。
+
+## 产品信息
+{product_info}
+
+## 笔记中的图片建议
+{image_suggestions_json}
+
+## 核心要求：模拟真人手机拍照，不是电商精修图！
+
+### 必须遵守的风格规则：
+- 画面像用手机随手拍的，不是专业摄影
+- 自然光线（窗边光/台灯光），不是影棚打灯
+- 背景有生活感（桌面有杂物、床单有褶皱、浴室有水渍）
+- 构图随意自然，不要太完美太对称
+- 人物只出现手、手臂、腿、背影、侧影，绝对不出现正脸
+- 色调自然偏暖，轻微过曝感，像手机自动HDR的效果
+- 不要出现品牌logo文字（AI生的文字会出错）
+
+### 6张图的具体要求：
+- 图1封面：产品+手部特写，俯拍或45度角，桌面/床上/沙发场景
+- 图2开箱：包装+手正在拆开，俯拍，能看到桌面环境
+- 图3使用：手臂/手部正在使用产品，侧拍，不露脸
+- 图4细节：产品材质/纹理超近距离微距，浅景深
+- 图5效果：before/after对比 或 产品和同类并排对比
+- 图6日常：产品在日常场景中的自然摆放（桌面/包里/浴室架上）
+
+## 输出JSON格式
+{{
+  "images": [
+    {{
+      "position": "图1-封面",
+      "prompt": "中文生图prompt（手机拍照风格，包含：主体+环境+光线+构图+风格）",
+      "negative_prompt": "精修，商业摄影，广告，完美光线，正脸，logo文字，棚拍，高饱和",
+      "style_tag": "手机随拍/俯拍/微距/侧拍"
+    }}
+  ],
+  "post_processing": "建议的后处理：轻微降饱和+加噪点+微过曝，模拟手机质感"
+}}
+
+只输出JSON。"""
+
+
+def build_xhs_review_image_prompt(
+    product_info: str,
+    image_suggestions_json: str,
+) -> str:
+    """构建小红书真人测评风格的生图prompt。"""
+    return XHS_REVIEW_IMAGE_PROMPT.format(
+        product_info=product_info,
+        image_suggestions_json=image_suggestions_json,
+    )
