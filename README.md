@@ -7,10 +7,68 @@
 ## 技术栈
 - 前端：Next.js 14 + TypeScript + Tailwind CSS + Shadcn UI
 - 后端：FastAPI + Python 3.11 + SQLAlchemy
-- AI：Claude API + DeepSeek
+- AI：Claude + DeepSeek + 豆包 + 通义千问 + 智谱GLM（多模型分工）
+- 生图：OpenAI GPT Image 1.5 + rembg 抠图 + 通义万相
+- 生视频：Seedance 1.5 Pro（火山引擎 ARK API）+ FFmpeg
+- TTS：火山引擎语音合成
 - 数据库：PostgreSQL 16 + Redis 7
 
 ## 版本记录
+
+### v2.1（2026-03-25）— 内容工厂全面升级 + 产品保真生图
+
+**素材与生图系统**
+- 素材库上传/管理功能完整接通（上传→存储→展示→删除）
+- 产品保真生图方案：rembg抠图 + OpenAI GPT Image 图生图（产品永不重画）
+  - 白底图：rembg + PIL 合成（100%保真，免费）
+  - 场景图：rembg抠图 + OpenAI 图生图（产品保真 + AI生成场景）
+  - 细节图：原图裁剪放大 + 锐化（100%保真，免费）
+  - 卖点图：产品抠图 + 渐变背景合成
+  - 模特图：OpenAI 图生图（人物 + 产品合成）
+- 两步式生图流程：AI构想提示词（可编辑）→ 确认后生成
+- 有素材时可不填商品信息，自动识别
+
+**SceneArchitect 视觉创意Agent**
+- 新增 SceneArchitect Agent（Claude Sonnet），替代硬编码 prompt 模板
+- 注入完整电商视觉知识：7大品类 × 5档价格带 × 4平台差异
+- 三模式用户意图处理：free（AI出方案选择）/ guided / precise
+- 核心原则：用户描述是法律，不是建议
+- 学习闭环：点赞存好案例 / 点踩提取教训 / 编辑prompt自动学习偏好
+
+**Seedance 视频生成**
+- 接入即梦 Seedance 1.5 Pro 真实 API（火山引擎 ARK）
+- 图生视频：产品图 + 创意描述 → 5-10秒宣传视频
+- FFmpeg 降级方案保留（无 API Key 时自动切换）
+
+**AI方案Tab**
+- 内容工厂新增"AI方案"Tab（首位）
+- 用户输入商品信息 → AI分析 → 跨平台内容营销方案 → 一键执行
+- 每个创作面板新增"AI推荐"按钮，自动填充最佳参数
+
+**Mock数据全面清理**
+- 所有前端页面从硬编码假数据改为真实API调用或空状态
+- 清理范围：选品雷达、商品管理、客服、订单、发布、数据分析
+- Onboarding 接入真实 completeOnboarding API
+
+**多模型分工**
+- 策略/审核 → Claude Opus（推理最强）
+- 场景构建 → Claude Sonnet（创意构想）
+- 抖音脚本 → 豆包 Seed 2.0 Pro
+- 小红书文案 → DeepSeek V3
+- 生图Prompt → 通义千问 Plus
+- 生图 → OpenAI GPT Image 1.5
+- 生视频 → Seedance 1.5 Pro
+- 批量杂活 → 智谱GLM Flash（免费）
+- 切换：AI_ENGINE_MODE=production 全走国内模型
+
+**Bug修复**
+- 素材库上传后不显示（API响应格式解析修复）
+- 生成图片URL 404（后端静态文件服务 + 前端API_BASE拼接）
+- AI推荐按钮静默失败（改为显示错误信息）
+- 视频生成中途返回丢失结果（localStorage持久化）
+- 生图API限流429（改为串行生成 + 间隔2秒）
+
+---
 
 ### v2.0（2026-03-24）— 全自动电商操盘系统（全面重写）
 
@@ -36,10 +94,6 @@
 - 前端视觉从管理后台风格改为AI驾驶舱风格（全局暗色+发光效果+过程可视化）
 - 技术架构新增：Celery+Beat、Redis Pub/Sub、多店铺模型、凭证加密、三层平台适配器
 - 平台优先级：Phase 1 = 抖音+小红书+1688，Phase 2 = 淘宝+拼多多+公众号
-
-**移除**
-- 移除积分计费系统（运营力），商业化方案待产品验证后决定
-- 移除所有"用户先操作，系统再响应"的交互模式
 
 ---
 

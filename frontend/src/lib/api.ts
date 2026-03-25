@@ -95,6 +95,11 @@ export async function listPipelines() {
   return api.get("/api/pipeline/list");
 }
 
+// ── Products ──
+export async function listProducts() {
+  return api.get("/api/listing/products");
+}
+
 // ── Stores ──
 export async function listStores() {
   return api.get("/api/stores/list");
@@ -144,7 +149,7 @@ export async function setModuleMode(moduleId: string, mode: "auto" | "review", s
 
 // ── Content ──
 export async function generateContent(data: {
-  product_info: string; platform?: string; style_id?: string; style?: string; notes?: string;
+  product_info: string; platform?: string; style_id?: string; style?: string; notes?: string; asset_ids?: string[];
 }) {
   return api.post("/api/content/generate", data);
 }
@@ -179,6 +184,77 @@ export async function updatePreferences(prefs: Record<string, any>) {
 
 export async function getMemoryStats() {
   return api.get("/api/content/agent/memory-stats");
+}
+
+// ── Visual Design ──
+export async function previewMainImagePrompts(data: {
+  product_info?: string; source_asset_ids?: string[]; styles?: string[];
+  scene_description?: string; mood_keywords?: string[];
+}) {
+  return api.post("/api/content/main-image/preview-prompts", data);
+}
+
+export async function generateMainImages(data: {
+  product_info: string; styles?: string[]; with_model?: boolean; model_asset_id?: string; size?: string;
+  source_asset_ids?: string[]; scene_description?: string; mood_keywords?: string[];
+  custom_prompts?: Array<{ style: string; prompt: string; negative_prompt: string }>;
+}) {
+  return api.post("/api/content/main-image/generate", data);
+}
+
+export async function generatePromoVideo(data: {
+  product_info: string; image_asset_ids?: string[]; model_asset_id?: string; duration?: number; voice?: string;
+  scene_description?: string;
+}) {
+  return api.post("/api/content/promo-video/generate", data);
+}
+
+export async function generateAIModel(data: {
+  gender?: string; age_range?: string; style_tags?: string[];
+}) {
+  return api.post("/api/content/ai-model/generate", data);
+}
+
+export async function listAIModels() {
+  return api.get("/api/content/ai-models");
+}
+
+export async function uploadAsset(file: File, category: string, productId?: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("category", category);
+  if (productId) formData.append("product_id", productId);
+
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const resp = await fetch(`${API_BASE}/api/content/assets/upload`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: `HTTP ${resp.status}` }));
+    throw new Error(err.detail || `上传失败 (${resp.status})`);
+  }
+  return resp.json();
+}
+
+export async function listAssets(category?: string) {
+  const query = category ? `?category=${category}` : "";
+  return api.get(`/api/content/assets/list${query}`);
+}
+
+export async function deleteAsset(assetId: string) {
+  return api.delete(`/api/content/assets/${assetId}`);
+}
+
+// ── AI Smart Plan ──
+export async function getSmartPlan(data: {
+  product_info: string; product_id?: string; budget_hint?: string; focus_type?: string;
+}) {
+  return api.post("/api/content/smart-plan", data);
 }
 
 // ── SSE ──

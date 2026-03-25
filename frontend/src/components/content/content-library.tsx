@@ -1,33 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { Copy, Download, RotateCcw, Check, Eye, Filter } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Copy, Download, RotateCcw, Check, Eye, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { listContents } from "@/lib/api";
 
-// Mock内容数据（后续接API）
-const MOCK_CONTENTS = [
-  {
-    id: "1", title: "冰丝防晒衣种草视频", type: "short_video", platform: "douyin",
-    status: "published", feedback: 1, model: "doubao", created_at: "2026-03-25 14:30",
-    preview_text: "还在被晒得黑白分层？这件冰丝防晒衣只要29.9...",
-    metrics: { views: 12000, likes: 342 },
-  },
-  {
-    id: "2", title: "防晒衣真人测评", type: "xhs_note", platform: "xiaohongshu",
-    status: "approved", feedback: null, model: "deepseek", created_at: "2026-03-25 14:33",
-    preview_text: "💰29.9的冰丝防晒衣！用了两周说下真实感受...",
-    metrics: null,
-  },
-  {
-    id: "3", title: "便携风扇淘宝Listing", type: "listing", platform: "taobao",
-    status: "draft", feedback: null, model: "qwen", created_at: "2026-03-25 13:00",
-    preview_text: "【夏季必备】USB便携风扇 三档风速...",
-    metrics: null,
-  },
-];
+interface ContentItem {
+  id: string;
+  title: string;
+  type: string;
+  platform: string;
+  status: string;
+  feedback: number | null;
+  model: string;
+  created_at: string;
+  preview_text: string;
+  metrics?: { views: number; likes: number } | null;
+}
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   draft: { label: "草稿", color: "text-muted-foreground border-border/50" },
@@ -48,6 +40,24 @@ export function ContentLibrary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [contents, setContents] = useState<ContentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchContents = useCallback(async () => {
+    try {
+      setLoading(true);
+      const resp = await listContents();
+      const raw = resp?.data ?? resp ?? {};
+      const data = Array.isArray(raw) ? raw : (raw.contents ?? raw.items ?? []);
+      setContents(Array.isArray(data) ? data : []);
+    } catch {
+      setContents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchContents(); }, [fetchContents]);
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -55,10 +65,10 @@ export function ContentLibrary() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const filteredContents = MOCK_CONTENTS.filter((c) => {
+  const filteredContents = contents.filter((c) => {
     if (platformFilter !== "all" && c.platform !== platformFilter) return false;
     if (statusFilter !== "all" && c.status !== statusFilter) return false;
-    if (searchQuery && !c.title.includes(searchQuery) && !c.preview_text.includes(searchQuery)) return false;
+    if (searchQuery && !c.title?.includes(searchQuery) && !c.preview_text?.includes(searchQuery)) return false;
     return true;
   });
 
@@ -98,7 +108,12 @@ export function ContentLibrary() {
       </div>
 
       {/* 内容卡片列表 */}
-      {filteredContents.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-12">
+          <Loader2 className="h-6 w-6 mx-auto animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground mt-2">加载中...</p>
+        </div>
+      ) : filteredContents.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground text-sm">
           暂无内容，去创作中心生成吧
         </div>

@@ -4,11 +4,7 @@ import { Truck, Package, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { ModulePageLayout, AutoModePanel } from "@/components/shared/module-page-layout";
 import { Badge } from "@/components/ui/badge";
 
-const MOCK_ORDERS = [
-  { id: "DY20260324001", product: "冰丝防晒衣", platform: "抖音", status: "shipped", logistics: "圆通 YT9876543210", supplier: "广州XX工厂", cost: 15.8 },
-  { id: "DY20260324002", product: "冰丝防晒衣", platform: "抖音", status: "forwarded", logistics: "待发货", supplier: "广州XX工厂", cost: 15.8 },
-  { id: "PDD20260323005", product: "便携风扇USB", platform: "拼多多", status: "pending", logistics: "—", supplier: "义乌YY电器", cost: 12.5 },
-];
+const MOCK_ORDERS: Array<{ id: string; product: string; platform: string; status: string; logistics: string; supplier: string; cost: number }> = [];
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: "待转发", color: "text-amber-400 border-amber-500/30 bg-amber-500/10" },
@@ -28,17 +24,12 @@ export default function OrdersPage() {
           icon={<Truck className="h-5 w-5" />}
           description="订单自动转发给1688供应商一件代发，物流自动追踪"
           metrics={[
-            { label: "待处理订单", value: 1 },
-            { label: "运输中", value: 2 },
-            { label: "今日成交", value: 5 },
-            { label: "平均发货时间", value: "18h" },
+            { label: "待处理订单", value: 0 },
+            { label: "运输中", value: 0 },
+            { label: "今日成交", value: 0 },
+            { label: "平均发货时间", value: "-" },
           ]}
-          recentActions={[
-            { time: "15:30", text: "订单 DY...001 已发货，圆通 YT9876543210" },
-            { time: "14:20", text: "订单 DY...002 已转发给 广州XX工厂" },
-            { time: "13:00", text: "新订单 PDD...005 收到，准备转发供应商" },
-            { time: "10:00", text: "物流更新: 3个包裹在途" },
-          ]}
+          recentActions={[]}
         />
       }
       reviewView={

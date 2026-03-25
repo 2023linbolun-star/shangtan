@@ -8,6 +8,7 @@ API文档：https://help.aliyun.com/zh/model-studio/text-to-image
 """
 
 import asyncio
+import base64
 import logging
 import os
 import time
@@ -28,6 +29,7 @@ async def generate_image(
     size: str = "1080*1920",
     n: int = 1,
     save_dir: str | None = None,
+    ref_image_path: str | None = None,
 ) -> list[dict]:
     """
     调用通义万相生成图片。
@@ -66,6 +68,17 @@ async def generate_image(
     }
     if negative_prompt:
         body["input"]["negative_prompt"] = negative_prompt
+
+    # 参考图片支持：将本地图片base64编码后作为ref_img传入
+    if ref_image_path and os.path.isfile(ref_image_path):
+        try:
+            with open(ref_image_path, "rb") as f:
+                encoded = base64.b64encode(f.read()).decode("utf-8")
+            body["input"]["ref_img"] = f"data:image/jpeg;base64,{encoded}"
+            body["parameters"]["ref_strength"] = 0.8
+            logger.info(f"Using ref image: {ref_image_path}")
+        except Exception as e:
+            logger.warning(f"Failed to read ref image {ref_image_path}: {e}")
 
     start = time.perf_counter()
 
@@ -129,8 +142,14 @@ async def generate_image(
             logger.warning(f"Failed to download image {i}: {e}")
             local_path = ""
 
+        # Build a static URL from the local path for frontend access
+        static_url = url  # fallback to CDN URL
+        if local_path and ASSETS_DIR in local_path:
+            relative = local_path.split(ASSETS_DIR)[-1].lstrip("/\\")
+            static_url = f"/static/assets/{relative}"
+
         images.append({
-            "url": url,
+            "url": static_url,
             "local_path": local_path,
             "cost": 0.04,  # 通义万相turbo定价
         })

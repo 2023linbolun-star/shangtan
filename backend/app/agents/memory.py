@@ -3,11 +3,15 @@ MemoryStore — Agent 进化系统的数据读写层。
 管理 User DNA、Few-shot 案例库、失败教训、执行记录、偏好学习。
 """
 
+import json
+import logging
 from datetime import datetime, timezone
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import AgentMemory, UserDNA, FewShotExample, FailurePattern
+
+logger = logging.getLogger("shangtanai.agents.memory")
 
 
 class MemoryStore:
@@ -435,3 +439,113 @@ class MemoryStore:
             if feedback_score == -1:
                 memory.was_rejected = True
             await self.db.flush()
+
+    # ══════════════════════════════════════════════════════════
+    #  Prompt 编辑学习（从用户对prompt的修改中学习视觉偏好）
+    # ══════════════════════════════════════════════════════════
+
+    async def learn_from_prompt_edit(
+        self,
+        user_id: str,
+        original_prompt: str,
+        edited_prompt: str,
+        context: dict | None = None,
+    ) -> dict:
+        """
+        从用户对生图prompt的编辑中学习视觉偏好。
+
+        Uses GLM (free, via ai_analyze_full with task_type="violation") to diff
+        the two prompts and extract preference signals.
+
+        Args:
+            user_id: user identifier
+            original_prompt: AI-generated original prompt
+            edited_prompt: user-edited version of the prompt
+            context: optional context dict (e.g. style, product_info)
+
+        Returns:
+            {
+                "action": "visual_preference_learned",
+                "added_elements": [...],
+                "removed_elements": [...],
+                "style_shift": "...",
+                "preference_signal": "..."
+            }
+        """
+        from app.services.ai_engine import ai_analyze_full
+
+        context = context or {}
+
+        # Use GLM (free) to analyze the diff between original and edited prompts
+        diff_prompt = (
+            f"对比以下两个生图prompt，分析用户的编辑意图。\n\n"
+            f"原始prompt：{original_prompt}\n\n"
+            f"用户修改后：{edited_prompt}\n\n"
+            f"请输出JSON格式：\n"
+            f'{{"added_elements": ["用户新增的元素"], '
+            f'"removed_elements": ["用户删除的元素"], '
+            f'"style_shift": "风格变化方向描述（如：从商业感转向生活感）", '
+            f'"preference_signal": "一句话总结用户的视觉偏好倾向"}}\n\n'
+            f"只输出JSON。"
+        )
+
+        try:
+            result = await ai_analyze_full(diff_prompt, task_type="violation")
+            raw_text = result.get("text", "{}").strip()
+            # Clean markdown code blocks
+            if raw_text.startswith("```"):
+                lines = raw_text.split("\n")
+                lines = [l for l in lines if not l.strip().startswith("```")]
+                raw_text = "\n".join(lines)
+            diff_data = json.loads(raw_text)
+        except Exception as e:
+            logger.warning(f"Failed to analyze prompt edit diff: {e}")
+            diff_data = {
+                "added_elements": [],
+                "removed_elements": [],
+                "style_shift": "",
+                "preference_signal": "",
+            }
+
+        added = diff_data.get("added_elements", [])
+        removed = diff_data.get("removed_elements", [])
+        style_shift = diff_data.get("style_shift", "")
+        preference_signal = diff_data.get("preference_signal", "")
+
+        # Store preference_signal in UserDNA via visual_preferences
+        if preference_signal:
+            visual_prefs = {
+                "visual_preference": preference_signal,
+            }
+            if style_shift:
+                visual_prefs["preferred_color_tone"] = style_shift
+            await self.update_user_dna(user_id, visual_prefs)
+
+        # Store removed_elements as FailurePattern entries
+        for elem in removed:
+            if elem:
+                await self.add_failure_pattern(
+                    user_id=user_id,
+                    agent_type="scene_architect",
+                    pattern=f"用户不喜欢生图中出现: {elem}",
+                    source="prompt_edit",
+                )
+
+        # Store the edited version as a FewShotExample
+        if edited_prompt and edited_prompt != original_prompt:
+            keyword = context.get("product_info", edited_prompt[:50])
+            await self.add_few_shot(
+                user_id=user_id,
+                agent_type="scene_architect",
+                keyword=keyword[:50],
+                output_summary=edited_prompt[:500],
+                platform=context.get("platform"),
+            )
+
+        return {
+            "action": "visual_preference_learned",
+            "added_elements": added,
+            "removed_elements": removed,
+            "style_shift": style_shift,
+            "preference_signal": preference_signal,
+        }

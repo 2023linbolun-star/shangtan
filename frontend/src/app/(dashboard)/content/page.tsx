@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import {
   FileText, Sparkles, Settings2, Palette, FolderOpen, Image as ImageIcon,
   Brain, ThumbsUp, ThumbsDown, Loader2, X, ChevronDown, ChevronUp,
-  ArrowLeft,
+  ArrowLeft, Copy, Send, Check, Paperclip, Video,
 } from "lucide-react";
 import { ModulePageLayout, AutoModePanel } from "@/components/shared/module-page-layout";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { CreationCards, type CreationType } from "@/components/content/creation-cards";
 import { ContentLibrary } from "@/components/content/content-library";
 import { AssetLibrary } from "@/components/content/asset-library";
+import { MainImagePanel } from "@/components/content/main-image-panel";
+import { PromoVideoPanel } from "@/components/content/promo-video-panel";
+import { SmartPlanPanel } from "@/components/content/smart-plan-panel";
 import {
   getContentStyles, getPreferences, updatePreferences, getMemoryStats,
-  generateContent, submitFeedback,
+  generateContent, submitFeedback, getSmartPlan,
 } from "@/lib/api";
 import { useEffect } from "react";
 
@@ -157,27 +160,95 @@ function CreatePanel({ creationType, onBack }: { creationType: CreationType; onB
   const [attributionSteps, setAttributionSteps] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
   const [feedbackMsg, setFeedbackMsg] = useState("");
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [assetsExpanded, setAssetsExpanded] = useState(false);
+  const [editedContent, setEditedContent] = useState("");
+  const [contentSaved, setContentSaved] = useState(false);
+  const [modifyInstruction, setModifyInstruction] = useState("");
+  const [previousResult, setPreviousResult] = useState<any>(null);
+  const [modifying, setModifying] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [aiRecommending, setAiRecommending] = useState(false);
+  const [aiRecommended, setAiRecommended] = useState(false);
+  const [realAssets, setRealAssets] = useState<Array<{ id: string; file_type: string; name: string; category: string; file_url?: string }>>([]);
+
+  useEffect(() => {
+    import("@/lib/api").then(({ listAssets }) =>
+      listAssets().then(resp => {
+        const raw = resp?.data ?? resp ?? {};
+        const data = Array.isArray(raw) ? raw : (raw.assets ?? raw.items ?? []);
+        setRealAssets(Array.isArray(data) ? data : []);
+      }).catch(() => {})
+    );
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!productInfo.trim()) return;
     setGenerating(true);
     setResult(null);
+    setPreviousResult(null);
     setFeedbackMsg("");
+    setEditedContent("");
+    setContentSaved(false);
     setAttributionSteps(["正在加载你的偏好设置..."]);
     await new Promise((r) => setTimeout(r, 500));
     setAttributionSteps((p) => [...p, "正在加载历史优秀案例..."]);
 
     try {
-      const res = await generateContent({ product_info: productInfo, platform, style_id: styleId || undefined });
+      const res = await generateContent({
+        product_info: productInfo,
+        platform,
+        style_id: styleId || undefined,
+        asset_ids: selectedAssets.length > 0 ? selectedAssets : undefined,
+      });
       const applied = res.data?.applied_preferences || [];
       setAttributionSteps(applied.length > 0 ? applied.map((a: string) => `✓ ${a}`) : ["✓ 已使用默认设置"]);
       setResult(res.data);
+      const content = typeof res.data?.content === "string" ? res.data.content : JSON.stringify(res.data?.content, null, 2);
+      setEditedContent(content);
     } catch (e: any) {
       setResult({ error: e.message });
     } finally {
       setGenerating(false);
     }
-  }, [productInfo, platform, styleId]);
+  }, [productInfo, platform, styleId, selectedAssets]);
+
+  const handleModify = useCallback(async () => {
+    if (!modifyInstruction.trim() || !result) return;
+    setModifying(true);
+    setPreviousResult(result);
+    try {
+      const combinedInfo = `${productInfo}\n\n--- 修改指令 ---\n原内容：\n${editedContent}\n\n修改要求：${modifyInstruction}`;
+      const res = await generateContent({
+        product_info: combinedInfo,
+        platform,
+        style_id: styleId || undefined,
+        asset_ids: selectedAssets.length > 0 ? selectedAssets : undefined,
+      });
+      setResult(res.data);
+      const content = typeof res.data?.content === "string" ? res.data.content : JSON.stringify(res.data?.content, null, 2);
+      setEditedContent(content);
+      setModifyInstruction("");
+      setContentSaved(false);
+    } catch (e: any) {
+      setResult({ error: e.message });
+    } finally {
+      setModifying(false);
+    }
+  }, [modifyInstruction, result, productInfo, editedContent, platform, styleId, selectedAssets]);
+
+  const handleCopyContent = useCallback(() => {
+    navigator.clipboard.writeText(editedContent).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [editedContent]);
+
+  const handleQueue = useCallback(() => {
+    setQueued(true);
+    setTimeout(() => setQueued(false), 2000);
+  }, []);
 
   const handleFeedback = useCallback(async (vote: number) => {
     if (!result?.id) return;
@@ -186,6 +257,14 @@ function CreatePanel({ creationType, onBack }: { creationType: CreationType; onB
       setFeedbackMsg(res.data?.learned?.message || "反馈已记录");
     } catch {}
   }, [result]);
+
+  // Route to specialized panels for visual design
+  if (creationType.id === "product_main_image") {
+    return <MainImagePanel onBack={onBack} />;
+  }
+  if (creationType.id === "promo_video") {
+    return <PromoVideoPanel onBack={onBack} />;
+  }
 
   const Icon = creationType.icon;
 
@@ -220,6 +299,75 @@ function CreatePanel({ creationType, onBack }: { creationType: CreationType; onB
       {/* 风格选择 */}
       <StyleSelector platform={platform} selectedStyle={styleId} onSelect={setStyleId} />
 
+      {/* 附加素材 M3-A1 */}
+      <div className="space-y-2">
+        <button
+          onClick={() => setAssetsExpanded(!assetsExpanded)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Paperclip className="h-3 w-3" />
+          <span>附加素材</span>
+          {selectedAssets.length > 0 && (
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-cyan-500/30 text-cyan-400">
+              {selectedAssets.length}
+            </Badge>
+          )}
+          {assetsExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </button>
+        {assetsExpanded && (
+          <div className="grid grid-cols-3 gap-2 p-2 rounded-lg border border-border/30 bg-muted/10">
+            {realAssets.map((asset) => {
+              const isSelected = selectedAssets.includes(asset.id);
+              return (
+                <button
+                  key={asset.id}
+                  onClick={() =>
+                    setSelectedAssets((prev) =>
+                      isSelected ? prev.filter((id) => id !== asset.id) : [...prev, asset.id]
+                    )
+                  }
+                  className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all text-center ${
+                    isSelected
+                      ? "border-cyan-500/50 bg-cyan-500/10"
+                      : "border-border/30 hover:border-border/50"
+                  }`}
+                >
+                  <div className={`h-8 w-8 rounded flex items-center justify-center ${
+                    isSelected ? "bg-cyan-500/20" : "bg-muted/30"
+                  }`}>
+                    {asset.file_type === "video" ? (
+                      <Video className={`h-4 w-4 ${isSelected ? "text-cyan-400" : "text-muted-foreground"}`} />
+                    ) : (
+                      <ImageIcon className={`h-4 w-4 ${isSelected ? "text-cyan-400" : "text-muted-foreground"}`} />
+                    )}
+                  </div>
+                  <span className={`text-[10px] leading-tight line-clamp-2 ${isSelected ? "text-cyan-400" : "text-muted-foreground"}`}>
+                    {asset.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {selectedAssets.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {selectedAssets.map((id) => {
+              const asset = realAssets.find((a) => a.id === id);
+              if (!asset) return null;
+              return (
+                <span key={id} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/5 text-cyan-400">
+                  {asset.file_type === "video" ? <Video className="h-2.5 w-2.5" /> : <ImageIcon className="h-2.5 w-2.5" />}
+                  {asset.name}
+                  <button onClick={() => setSelectedAssets((prev) => prev.filter((i) => i !== id))}>
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* 产品信息 */}
       <div className="space-y-1.5">
         <div className="text-xs text-muted-foreground">产品/内容信息</div>
@@ -236,6 +384,39 @@ function CreatePanel({ creationType, onBack }: { creationType: CreationType; onB
           className="min-h-[80px] bg-muted/20 border-border/50 text-sm"
         />
       </div>
+
+      {/* AI推荐按钮 */}
+      <button
+        onClick={async () => {
+          if (!productInfo.trim()) return;
+          setAiRecommending(true);
+          try {
+            const focusMap: Record<string, string> = {
+              short_video: "short_video", xhs_note: "xhs_note",
+              ecommerce: "ecommerce", product_main_image: "product_main_image",
+              promo_video: "promo_video",
+            };
+            const focusType = focusMap[creationType.id] || undefined;
+            const res = await getSmartPlan({ product_info: productInfo, focus_type: focusType });
+            const rec = res.data?.plan;
+            if (rec?.recommended_style_id) setStyleId(rec.recommended_style_id);
+            if (rec?.platform) setPlatform(rec.platform);
+            setAiRecommended(true);
+            setTimeout(() => setAiRecommended(false), 3000);
+          } catch {}
+          setAiRecommending(false);
+        }}
+        disabled={!productInfo.trim() || aiRecommending}
+        className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 disabled:opacity-50 transition-colors"
+      >
+        {aiRecommending ? (
+          <><Loader2 className="h-3 w-3 animate-spin" /> AI分析中...</>
+        ) : aiRecommended ? (
+          <><Check className="h-3 w-3 text-green-400" /> <span className="text-green-400">AI已推荐</span></>
+        ) : (
+          <><Sparkles className="h-3 w-3" /> AI推荐最佳参数</>
+        )}
+      </button>
 
       {/* 生成按钮 */}
       <Button onClick={handleGenerate} disabled={generating || !productInfo.trim()}
@@ -256,6 +437,18 @@ function CreatePanel({ creationType, onBack }: { creationType: CreationType; onB
         </div>
       )}
 
+      {/* 对比：上一版结果 M3-B1 */}
+      {previousResult && !previousResult.error && (
+        <div className="rounded-xl border border-border/30 p-3 space-y-2 opacity-60">
+          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <ArrowLeft className="h-3 w-3" /> 上一版本
+          </div>
+          <pre className="text-xs text-foreground/60 whitespace-pre-wrap max-h-[150px] overflow-y-auto bg-muted/10 rounded-lg p-2 border border-border/20">
+            {typeof previousResult.content === "string" ? previousResult.content : JSON.stringify(previousResult.content, null, 2)}
+          </pre>
+        </div>
+      )}
+
       {/* 生成结果 */}
       {result && !result.error && (
         <div className="rounded-xl border border-border/50 p-4 space-y-3">
@@ -266,6 +459,20 @@ function CreatePanel({ creationType, onBack }: { creationType: CreationType; onB
               <span className="text-[10px] text-muted-foreground">${result.cost_usd}</span>
             </div>
             <div className="flex items-center gap-1">
+              {/* M3-C1: 发布入口 */}
+              <button onClick={handleCopyContent}
+                className="p-1.5 rounded-lg border border-border/50 hover:border-cyan-500/30 hover:bg-cyan-500/10 transition-all"
+                title="复制文案">
+                {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
+              </button>
+              <button onClick={handleQueue}
+                className={`p-1.5 rounded-lg border transition-all ${
+                  queued ? "border-green-500/30 bg-green-500/10" : "border-border/50 hover:border-cyan-500/30 hover:bg-cyan-500/10"
+                }`}
+                title="加入发布队列">
+                {queued ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Send className="h-3.5 w-3.5 text-muted-foreground" />}
+              </button>
+              <div className="w-px h-4 bg-border/30 mx-0.5" />
               <button onClick={() => handleFeedback(1)}
                 className="p-1.5 rounded-lg border border-border/50 hover:border-green-500/30 hover:bg-green-500/10">
                 <ThumbsUp className="h-3.5 w-3.5 text-muted-foreground" />
@@ -291,9 +498,49 @@ function CreatePanel({ creationType, onBack }: { creationType: CreationType; onB
               违规检测: {result.violation_check.risk_level === "green" ? "✓ 通过" : `⚠ ${result.violation_check.risk_level}`}
             </div>
           )}
-          <pre className="text-xs text-foreground/80 whitespace-pre-wrap max-h-[300px] overflow-y-auto bg-muted/20 rounded-lg p-3 border border-border/30">
-            {typeof result.content === "string" ? result.content : JSON.stringify(result.content, null, 2)}
-          </pre>
+          {/* M3-B2: 结果可编辑 */}
+          <div className="space-y-2">
+            <Textarea
+              value={editedContent}
+              onChange={(e) => { setEditedContent(e.target.value); setContentSaved(false); }}
+              className="text-xs text-foreground/80 min-h-[200px] max-h-[300px] bg-muted/20 border-border/30 font-mono"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-muted-foreground">
+                {editedContent !== (typeof result.content === "string" ? result.content : JSON.stringify(result.content, null, 2))
+                  ? "已修改，点击保存"
+                  : "可直接编辑内容"}
+              </span>
+              <Button
+                size="sm"
+                variant={contentSaved ? "default" : "outline"}
+                className="h-7 text-xs"
+                onClick={() => { setContentSaved(true); setTimeout(() => setContentSaved(false), 2000); }}
+              >
+                {contentSaved ? <><Check className="h-3 w-3 mr-1" />已保存</> : "保存修改"}
+              </Button>
+            </div>
+          </div>
+
+          {/* M3-B1: 迭代修改 */}
+          <div className="space-y-2 pt-2 border-t border-border/30">
+            <div className="text-xs text-muted-foreground">修改指令</div>
+            <Textarea
+              placeholder="输入修改要求，如：开头更吸引人、语气更活泼、加入价格对比..."
+              value={modifyInstruction}
+              onChange={(e) => setModifyInstruction(e.target.value)}
+              className="min-h-[60px] bg-muted/20 border-border/50 text-xs"
+            />
+            <Button
+              onClick={handleModify}
+              disabled={modifying || !modifyInstruction.trim()}
+              variant="outline"
+              className="w-full text-xs"
+            >
+              {modifying ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />修改中...</>
+                : <><Sparkles className="h-3.5 w-3.5 mr-1.5" />按要求修改</>}
+            </Button>
+          </div>
         </div>
       )}
       {result?.error && (
@@ -367,7 +614,7 @@ function PreferencesPanel() {
 // ══════════════════════════════════════════════════════════════
 
 export default function ContentPage() {
-  const [activeTab, setActiveTab] = useState("create");
+  const [activeTab, setActiveTab] = useState("smart-plan");
   const [selectedCreationType, setSelectedCreationType] = useState<CreationType | null>(null);
 
   return (
@@ -398,6 +645,9 @@ export default function ContentPage() {
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="bg-muted/30 w-full">
+              <TabsTrigger value="smart-plan" className="text-xs flex-1">
+                <Sparkles className="h-3 w-3 mr-1" /> AI方案
+              </TabsTrigger>
               <TabsTrigger value="create" className="text-xs flex-1">
                 <Sparkles className="h-3 w-3 mr-1" /> 创作中心
               </TabsTrigger>
@@ -411,6 +661,10 @@ export default function ContentPage() {
                 <Settings2 className="h-3 w-3 mr-1" /> 偏好
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="smart-plan" className="mt-4">
+              <SmartPlanPanel />
+            </TabsContent>
 
             <TabsContent value="create" className="mt-4">
               {selectedCreationType ? (

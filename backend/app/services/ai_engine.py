@@ -45,6 +45,7 @@ TASK_MAX_TOKENS = {
     "batch": 1024,          # 批量任务
     "keywords": 1024,       # 关键词
     "violation": 1024,      # 违规检测
+    "scene_architect": 4096, # 场景构建
 }
 
 # Pricing per 1M tokens (USD) for cost tracking
@@ -316,6 +317,9 @@ MODEL_MAP = {
     "keywords": (call_glm, {}),
     "violation": (call_glm, {}),
     "batch": (call_glm, {}),
+
+    # 场景构建 → Claude Sonnet（创意构想+用户意图理解）
+    "scene_architect": (call_claude, {}),
 }
 
 # 商业化阶段：全部切国内模型，降低成本
@@ -332,6 +336,7 @@ PRODUCTION_MODEL_MAP = {
     "keywords": (call_glm, {}),
     "violation": (call_glm, {}),
     "batch": (call_glm, {}),
+    "scene_architect": (call_deepseek, {"reasoning": True}),
 }
 
 # 降级容错链：按质量递减排列

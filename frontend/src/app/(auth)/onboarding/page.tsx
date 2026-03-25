@@ -12,9 +12,12 @@ export default function OnboardingPage() {
     categories: string[];
     automationLevel: string;
   }) => {
-    // TODO: POST to /api/onboarding with data
-    // For now, just redirect to cockpit after a brief delay
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const { completeOnboarding } = await import("@/lib/api");
+      await completeOnboarding(data);
+    } catch (err) {
+      console.error("Onboarding API failed:", err);
+    }
     router.push("/cockpit");
   };
 

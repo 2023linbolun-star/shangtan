@@ -1,6 +1,6 @@
 "use client";
 
-import { Video, Image, BookOpen, ShoppingBag, Wand2, Layers } from "lucide-react";
+import { Video, Image, BookOpen, ShoppingBag, Wand2, Layers, Camera, Film } from "lucide-react";
 
 export interface CreationType {
   id: string;
@@ -48,6 +48,24 @@ export const CREATION_TYPES: CreationType[] = [
     description: "商品标题+卖点+详情页文案，平台规则自动适配",
     color: "from-orange-500/20 to-orange-600/5 border-orange-500/20 hover:border-orange-500/40",
     platforms: ["taobao", "pinduoduo"],
+  },
+  {
+    id: "product_main_image",
+    icon: Camera,
+    title: "商品主图",
+    subtitle: "淘宝 / 天猫",
+    description: "AI生成电商5张主图：白底图、场景图、细节图、卖点图、模特图",
+    color: "from-emerald-500/20 to-emerald-600/5 border-emerald-500/20 hover:border-emerald-500/40",
+    platforms: ["taobao", "tmall"],
+  },
+  {
+    id: "promo_video",
+    icon: Film,
+    title: "商品宣传视频",
+    subtitle: "商品详情页",
+    description: "15-30秒商品展示视频，AI配音+BGM，适合商品详情页顶部展示",
+    color: "from-rose-500/20 to-rose-600/5 border-rose-500/20 hover:border-rose-500/40",
+    platforms: ["taobao", "tmall", "douyin"],
   },
   {
     id: "free_create",

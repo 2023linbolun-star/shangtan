@@ -85,6 +85,15 @@ ALAPI_TOKEN = os.getenv("ALAPI_TOKEN", "")  # alapi.cn free tier
 WANX_API_KEY = os.getenv("WANX_API_KEY", "")  # 和QWEN_API_KEY共用DashScope
 WANX_MODEL = os.getenv("WANX_MODEL", "wanx2.1-t2i-turbo")
 
+# 即梦 Seedance（火山引擎 ARK API 图生视频）
+# 复用 DOUBAO_API_KEY + DOUBAO_BASE_URL，不需要单独 key
+SEEDANCE_MODEL = os.getenv("SEEDANCE_MODEL", "ep-20260325104705-k6gpv")
+JIMENG_API_KEY = os.getenv("JIMENG_API_KEY", "")  # 兼容旧配置
+
+# 可灵 Kling（AI视频备选）
+KLING_ACCESS_KEY = os.getenv("KLING_ACCESS_KEY", "")
+KLING_SECRET_KEY = os.getenv("KLING_SECRET_KEY", "")
+
 # 火山引擎 TTS（AI配音）
 VOLCENGINE_ACCESS_KEY = os.getenv("VOLCENGINE_ACCESS_KEY", "")
 VOLCENGINE_APP_ID = os.getenv("VOLCENGINE_APP_ID", "")

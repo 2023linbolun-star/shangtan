@@ -67,6 +67,63 @@ def build_agent_system_prompt(
     return "\n".join(parts)
 
 
+def build_scene_architect_prompt(
+    role: str,
+    user_dna: dict | None = None,
+    few_shot_examples: list[dict] | None = None,
+    failure_guardrails: list[str] | None = None,
+) -> str:
+    """
+    构建 SceneArchitect 的 system prompt，在标准 Agent prompt 基础上
+    额外注入用户的视觉偏好（visual_preferences）。
+    """
+    # Start with the standard agent prompt
+    base = build_agent_system_prompt(
+        role=role,
+        user_dna=user_dna,
+        few_shot_examples=few_shot_examples,
+        failure_guardrails=failure_guardrails,
+    )
+
+    # Inject visual preferences if available in user_dna
+    if not user_dna:
+        return base
+
+    visual_sections = []
+
+    # overall_aesthetic
+    aesthetic = user_dna.get("visual_preference") or user_dna.get("overall_aesthetic")
+    if aesthetic:
+        visual_sections.append(f"- 整体美学风格: {aesthetic}")
+
+    # preferred_color_tone
+    color_tone = user_dna.get("preferred_color_tone")
+    if color_tone:
+        visual_sections.append(f"- 偏好色调: {color_tone}")
+
+    # avoided_visual_elements
+    avoided = user_dna.get("avoided_visual_elements")
+    if avoided:
+        if isinstance(avoided, list):
+            avoided = "、".join(avoided)
+        visual_sections.append(f"- 必须避免的视觉元素: {avoided}")
+
+    # category_visual_overrides
+    category_overrides = user_dna.get("category_visual_overrides")
+    if category_overrides and isinstance(category_overrides, dict):
+        for cat, override in category_overrides.items():
+            visual_sections.append(f"- {cat}品类视觉风格: {override}")
+
+    if visual_sections:
+        visual_block = (
+            "\n\n## 该用户的视觉偏好（必须遵循）\n"
+            + "\n".join(visual_sections)
+        )
+        return base + visual_block
+
+    return base
+
+
 def get_applied_preferences_list(user_dna: dict | None, few_shots: list | None, guardrails: list | None) -> list[str]:
     """
     生成归因流列表——记录这次生成实际引用了哪些用户数据。

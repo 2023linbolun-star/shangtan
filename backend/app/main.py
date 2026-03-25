@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api import auth, scout, content, listing, ads, ops, cs, data, credits, pipeline, feedback, stores, autopilot, onboarding
 from app.db.engine import init_db, close_db
@@ -72,3 +73,8 @@ app.include_router(feedback.router, prefix="/api/feedback", tags=["反馈与进�
 app.include_router(stores.router, prefix="/api/stores", tags=["店铺管理"])
 app.include_router(autopilot.router, prefix="/api/autopilot", tags=["自动驾驶"])
 app.include_router(onboarding.router, prefix="/api/onboarding", tags=["新用户引导"])
+
+# ── Static files (uploaded assets) ──
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "storage", "assets")
+os.makedirs(ASSETS_DIR, exist_ok=True)
+app.mount("/static/assets", StaticFiles(directory=ASSETS_DIR), name="assets")

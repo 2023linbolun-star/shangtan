@@ -2,7 +2,7 @@
 
 import { AutoReviewToggle } from "@/components/shared/auto-review-toggle";
 import { useAutopilotStore, type ModuleMode } from "@/stores/autopilot-store";
-import { Loader2, Clock } from "lucide-react";
+import { Loader2, Clock, ArrowRight } from "lucide-react";
 
 interface ModulePageLayoutProps {
   moduleId: string;
@@ -71,6 +71,7 @@ export function AutoModePanel({
   metrics,
   recentActions,
   onManualTrigger,
+  quickActions,
 }: {
   moduleId: string;
   icon: React.ReactNode;
@@ -78,7 +79,10 @@ export function AutoModePanel({
   metrics?: { label: string; value: string | number }[];
   recentActions?: { time: string; text: string }[];
   onManualTrigger?: () => void;
+  quickActions?: React.ReactNode;
 }) {
+  const setModuleMode = useAutopilotStore((s) => s.setModuleMode);
+
   return (
     <div className="space-y-4">
       {/* Status card */}
@@ -99,6 +103,20 @@ export function AutoModePanel({
           </button>
         )}
       </div>
+
+      {/* Quick actions */}
+      {quickActions && (
+        <div className="rounded-xl border border-border/50 bg-muted/10 p-4 space-y-3">
+          <div className="text-xs text-muted-foreground font-medium">快捷操作</div>
+          {quickActions}
+          <button
+            onClick={() => setModuleMode(moduleId, "review")}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-cyan-400 transition-colors mt-2"
+          >
+            需要更多操作？切换到审核模式 <ArrowRight className="h-3 w-3" />
+          </button>
+        </div>
+      )}
 
       {/* Metrics */}
       {metrics && metrics.length > 0 && (
