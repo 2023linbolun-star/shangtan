@@ -142,6 +142,45 @@ export async function setModuleMode(moduleId: string, mode: "auto" | "review", s
   return api.post(`/api/autopilot/module-mode${query}`, { module_id: moduleId, mode });
 }
 
+// ── Content ──
+export async function generateContent(data: {
+  product_info: string; platform?: string; style_id?: string; style?: string; notes?: string;
+}) {
+  return api.post("/api/content/generate", data);
+}
+
+export async function listContents() {
+  return api.get("/api/content/list");
+}
+
+export async function submitFeedback(contentId: string, vote: number, editNotes?: string) {
+  return api.post(`/api/content/${contentId}/feedback`, { vote, edit_notes: editNotes });
+}
+
+export async function getContentStyles(platform?: string, category?: string) {
+  const params = new URLSearchParams();
+  if (platform) params.set("platform", platform);
+  if (category) params.set("category", category);
+  const query = params.toString() ? `?${params}` : "";
+  return api.get(`/api/content/styles${query}`);
+}
+
+export async function selectStyle(platform: string, styleId: string) {
+  return api.post("/api/content/styles/select", { platform, style_id: styleId });
+}
+
+export async function getPreferences() {
+  return api.get("/api/content/preferences");
+}
+
+export async function updatePreferences(prefs: Record<string, any>) {
+  return api.post("/api/content/preferences", prefs);
+}
+
+export async function getMemoryStats() {
+  return api.get("/api/content/agent/memory-stats");
+}
+
 // ── SSE ──
 export function subscribePipeline(
   pipelineId: string,
