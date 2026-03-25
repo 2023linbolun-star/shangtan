@@ -436,6 +436,36 @@ async def _optimize_listings(keyword: str, product_selection: str, platforms: li
     return {"type": "listing", "data": result["text"], "cost": result["cost"]}
 
 
+async def _execute_media_production(db: AsyncSession, pipeline: Pipeline, step: PipelineStep, ctx: dict) -> dict:
+    """Step 3.5: 素材生产 — 将AI内容转化为可发布的视频/图文。"""
+    from app.services.media.producer import produce_all
+
+    generated_contents = ctx.get("generated_contents", [])
+    category = ctx.get("config", {}).get("category", "default")
+
+    if not generated_contents:
+        logger.warning("No generated contents for media production")
+        return {"media_assets": [], "ai_cost": ctx.get("ai_cost", 0)}
+
+    logger.info(f"Starting media production for {len(generated_contents)} contents")
+
+    media_results = await produce_all(
+        content_outputs=generated_contents,
+        category=category,
+    )
+
+    # 汇总成本
+    media_cost = sum(
+        r.get("cost_breakdown", {}).get("total", 0)
+        for r in media_results
+    )
+
+    return {
+        "media_assets": media_results,
+        "ai_cost": ctx.get("ai_cost", 0) + media_cost,
+    }
+
+
 async def _execute_publish_schedule(db: AsyncSession, pipeline: Pipeline, step: PipelineStep, ctx: dict) -> dict:
     """Step 4: 发布排期建议"""
     keyword = ctx.get("keyword", "")
@@ -473,5 +503,6 @@ STEP_EXECUTORS = {
     StepType.scout: _execute_scout,
     StepType.product_selection: _execute_product_selection,
     StepType.content: _execute_content,
+    StepType.media_production: _execute_media_production,
     StepType.publish_schedule: _execute_publish_schedule,
 }

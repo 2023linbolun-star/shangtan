@@ -79,3 +79,16 @@ WECHAT_OA_APP_SECRET = os.getenv("WECHAT_OA_APP_SECRET", "")
 
 # --- 趋势数据 ---
 ALAPI_TOKEN = os.getenv("ALAPI_TOKEN", "")  # alapi.cn free tier
+
+# --- 素材生产 ---
+# 通义万相（AI生图）
+WANX_API_KEY = os.getenv("WANX_API_KEY", "")  # 和QWEN_API_KEY共用DashScope
+WANX_MODEL = os.getenv("WANX_MODEL", "wanx2.1-t2i-turbo")
+
+# 火山引擎 TTS（AI配音）
+VOLCENGINE_ACCESS_KEY = os.getenv("VOLCENGINE_ACCESS_KEY", "")
+VOLCENGINE_APP_ID = os.getenv("VOLCENGINE_APP_ID", "")
+VOLCENGINE_TTS_VOICE = os.getenv("VOLCENGINE_TTS_VOICE", "zh_female_shuangkuaisisi_moon_bigtts")  # 双快丝丝-活力女声
+
+# 素材存储路径
+ASSETS_DIR = os.getenv("ASSETS_DIR", "storage/assets")

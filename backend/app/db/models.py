@@ -62,6 +62,7 @@ class StepType(str, enum.Enum):
     scout = "scout"
     product_selection = "product_selection"
     content = "content"
+    media_production = "media_production"
     listing = "listing"
     publish_schedule = "publish_schedule"
     trend_scan = "trend_scan"

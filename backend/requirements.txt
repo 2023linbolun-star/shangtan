@@ -37,3 +37,6 @@ celery[redis]==5.4.0
 
 # Encryption
 cryptography==44.0.0
+
+# Media Production
+Pillow==11.1.0
